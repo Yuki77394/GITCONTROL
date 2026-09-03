@@ -1,0 +1,79 @@
+{
+  "name": "swaggymusic-github-bot",
+  "description": "SWAGGYMUSIC GitHub Controller Bot — a Telegram bot that manages GitHub repositories, issues, pull requests, GitHub Actions, releases, discussions, and webhooks directly from Telegram. Features AES-256-GCM encrypted token storage, per-event notification settings, GraphQL API support (pin/unpin, draft/ready, discussions), and secure webhook signature verification.",
+  "website": "https://github.com/Yuki77394/GITCONTROL",
+  "repository": "https://github.com/Yuki77394/GITCONTROL",
+  "logo": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+  "success_url": "/health",
+  "stack": "container",
+  "env": {
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Telegram Bot Token from @BotFather (https://t.me/BotFather). Format: 123456789:ABC-DEF...",
+      "required": true
+    },
+    "BOT_OWNER_IDS": {
+      "description": "Comma-separated Telegram user IDs that own this bot instance. Owners can use server-level credentials and reload admin caches. Get your ID from @userinfobot.",
+      "required": true
+    },
+    "MONGODB_URI": {
+      "description": "External MongoDB connection string. Use MongoDB Atlas (https://www.mongodb.com/atlas). Example: mongodb+srv://user:pass@cluster.mongodb.net/db?retryWrites=true&w=majority. The bot does NOT run MongoDB inside the dyno.",
+      "required": true
+    },
+    "MONGODB_DATABASE": {
+      "description": "MongoDB database name. Defaults to swaggymusic_github_bot if left empty, but must be set explicitly for Heroku.",
+      "value": "swaggymusic_github_bot",
+      "required": true
+    },
+    "GITHUB_API_URL": {
+      "description": "GitHub API URL. Use https://api.github.com for github.com. For GitHub Enterprise Server, set to https://YOUR-HOST/api/v3.",
+      "value": "https://api.github.com",
+      "required": true
+    },
+    "GITHUB_CLIENT_ID": {
+      "description": "GitHub OAuth App Client ID from https://github.com/settings/developers. Required only if using OAuth (PAT-only mode works without it).",
+      "required": false
+    },
+    "GITHUB_CLIENT_SECRET": {
+      "description": "GitHub OAuth App Client Secret. Required only if GITHUB_CLIENT_ID is set.",
+      "required": false
+    },
+    "GITHUB_OAUTH_CALLBACK_URL": {
+      "description": "GitHub OAuth callback URL. Must be https://YOUR-APP-NAME.herokuapp.com/oauth/callback. Set this AFTER creating the app, using your Heroku app URL.",
+      "required": false
+    },
+    "GITHUB_WEBHOOK_SECRET": {
+      "description": "Shared secret used to validate incoming GitHub webhook payloads. A strong random value is generated automatically.",
+      "generator": "secret",
+      "required": true
+    },
+    "ENCRYPTION_KEY": {
+      "description": "32-byte (64 hex characters) AES-256-GCM key used to encrypt stored GitHub tokens at rest. A strong random value is generated automatically. WARNING: if this key is lost or changed, all previously encrypted tokens become unrecoverable.",
+      "generator": "secret",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Random secret used to sign session cookies and OAuth state tokens. A strong random value is generated automatically.",
+      "generator": "secret",
+      "required": true
+    },
+    "PUBLIC_BASE_URL": {
+      "description": "Public HTTPS URL of this Heroku app (no trailing slash). Used for GitHub OAuth callback and webhook URLs. Set this to https://YOUR-APP-NAME.herokuapp.com AFTER the app is created, then restart the dyno. The app will fail to start without this set.",
+      "required": true
+    },
+    "LOG_LEVEL": {
+      "description": "Logging verbosity. One of: debug, info, warn, error. Use info or warn in production to avoid leaking debug details.",
+      "value": "info",
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "healthcheck": {
+    "path": "/health",
+    "timeout": 10
+  }
+}
