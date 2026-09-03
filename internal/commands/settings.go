@@ -103,8 +103,8 @@ No analytics, telemetry, or advertising SDKs are used.`
 // Callback data formats:
 //
 //	c:noop                              — no-op (just answers the callback)
-//	c:ar:pg:<page>                      — paginate repo list
-//	c:ar:<owner/repo>                   — add repo
+//	c:arp:<page>                        — paginate repo list (add-repo-page)
+//	c:ar:<owner/repo>                   — add repo (select from list)
 //	c:cfg:<owner/repo>                  — show repo config panel
 //	c:cfg:back                          — go back to repo list
 //	c:mute:<owner/repo>                 — toggle repo mute
@@ -113,32 +113,39 @@ No analytics, telemetry, or advertising SDKs are used.`
 //	c:evall:<owner/repo>:off            — disable all events
 //	c:evback:<owner/repo>               — back to repo config from events
 //	c:evlist:<owner/repo>               — show events list (alias for cfg)
+//
+// The "arp" prefix (add-repo-page) is deliberately distinct from "ar"
+// (add-repo) to avoid the strings.Split collision that previously caused
+// pagination buttons (c:arpg:<page>) to do nothing — they were split as
+// ["c", "arpg", "<page>"] and parts[1]="arpg" matched no case.
 func (d *Dispatcher) dispatchSettingsCallback(ctx context.Context, cq *tgbotapi.CallbackQuery, data string) {
-	parts := strings.Split(data, ":")
+	parts := strings.SplitN(data, ":", 4)
 	if len(parts) < 2 {
+		_ = d.deps.Bot.AnswerCallback(cq.ID, "Invalid callback", true)
 		return
 	}
 	switch parts[1] {
 	case "noop":
 		_ = d.deps.Bot.AnswerCallback(cq.ID, "", false)
-	case "ar": // add repo
+	case "arp": // add-repo pagination
 		if len(parts) < 3 {
+			_ = d.deps.Bot.AnswerCallback(cq.ID, "Missing page", true)
 			return
 		}
-		if parts[2] == "pg" {
-			if len(parts) < 4 {
-				return
-			}
-			var page int
-			fmt.Sscanf(parts[3], "%d", &page)
-			if page < 1 {
-				page = 1
-			}
-			_ = d.deps.Bot.AnswerCallback(cq.ID, "", false)
-			_ = d.sendRepoList(ctx, cq.Message, page)
+		var page int
+		fmt.Sscanf(parts[2], "%d", &page)
+		if page < 1 {
+			page = 1
+		}
+		_ = d.deps.Bot.AnswerCallback(cq.ID, "", false)
+		_ = d.sendRepoListWithCallback(ctx, cq.Message, page, cq)
+	case "ar": // add repo (select from list)
+		if len(parts) < 3 {
+			_ = d.deps.Bot.AnswerCallback(cq.ID, "Missing repo", true)
 			return
 		}
-		// parts[2] is owner/repo.
+		// parts[2] is owner/repo. Use Join to handle any edge case where
+		// the repo name contains a colon (rare but possible).
 		full := strings.Join(parts[2:], ":")
 		full = strings.TrimPrefix(full, "//")
 		owner, repo, err := splitRepo(full)

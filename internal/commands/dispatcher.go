@@ -186,14 +186,14 @@ func (d *Dispatcher) handleCommand(ctx context.Context, m *tgbotapi.Message) {
 func (d *Dispatcher) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQuery) {
 	data := cq.Data
 	if data == "" {
+		// Answer to clear the loading spinner even for empty data.
+		_ = d.deps.Bot.AnswerCallback(cq.ID, "", false)
 		return
 	}
-	// Always answer the callback to remove the loading state.
-	defer func() {
-		_ = d.deps.Bot.AnswerCallback(cq.ID, "", false)
-	}()
-
-	// Route by prefix.
+	// Route by prefix. Each handler is responsible for answering the
+	// callback (via d.deps.Bot.AnswerCallback) so it can include a
+	// contextual toast message. If a handler forgets to answer, Telegram
+	// will keep the spinner spinning for ~10 seconds then auto-clear.
 	switch {
 	case strings.HasPrefix(data, "c:"):
 		d.handleSettingsCallback(ctx, cq, data)
@@ -201,6 +201,9 @@ func (d *Dispatcher) handleCallback(ctx context.Context, cq *tgbotapi.CallbackQu
 		d.handleActionCallback(ctx, cq, data)
 	case strings.HasPrefix(data, "gh:"):
 		d.handleAccessCallback(ctx, cq, data)
+	default:
+		// Unknown prefix — answer to clear the spinner.
+		_ = d.deps.Bot.AnswerCallback(cq.ID, "Unknown action", false)
 	}
 }
 

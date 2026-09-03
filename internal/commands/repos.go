@@ -414,7 +414,29 @@ func (d *Dispatcher) repoActionConfirm(ctx context.Context, m *tgbotapi.Message,
 }
 
 // sendRepoList shows the user's accessible repos for interactive selection.
+//
+// When called from a callback query (cq != nil), it EDITS the existing
+// message (so pagination feels smooth and doesn't spam the chat with new
+// messages). When called from a command (cq == nil), it sends a new message.
+//
+// Callback data format (pagination):
+//
+//	c:arp:<page>   — navigate to page <page>
+//	c:ar:<owner/repo> — select a repo to add
+//
+// The "arp" prefix (add-repo-page) is deliberately distinct from "ar"
+// (add-repo) to avoid the strings.Split collision that previously caused
+// pagination buttons to do nothing.
 func (d *Dispatcher) sendRepoList(ctx context.Context, m *tgbotapi.Message, page int) error {
+	return d.sendRepoListWithCallback(ctx, m, page, nil)
+}
+
+// sendRepoListWithCallback is like sendRepoList but, when cq is non-nil,
+// edits the cq's message instead of sending a new one.
+func (d *Dispatcher) sendRepoListWithCallback(ctx context.Context, m *tgbotapi.Message, page int, cq *tgbotapi.CallbackQuery) error {
+	if page < 1 {
+		page = 1
+	}
 	client, _, err := d.deps.Access.GetDecryptedClient(ctx, m.From.ID)
 	if err != nil {
 		_, _ = d.replyMsg(m, "⚠️ Please /connect your GitHub account first.")
@@ -426,9 +448,13 @@ func (d *Dispatcher) sendRepoList(ctx context.Context, m *tgbotapi.Message, page
 		_, _ = d.replyMsg(m, fmt.Sprintf("❌ Failed to list repos: %v", err))
 		return nil
 	}
-	if len(repos) == 0 {
+	if len(repos) == 0 && page == 1 {
 		_, _ = d.replyMsg(m, "No repositories found.")
 		return nil
+	}
+	if len(repos) == 0 {
+		// Requested a page beyond the last one — go back to page 1.
+		return d.sendRepoListWithCallback(ctx, m, 1, cq)
 	}
 	var rows [][]telegram.Button
 	for _, r := range repos {
@@ -438,17 +464,28 @@ func (d *Dispatcher) sendRepoList(ctx context.Context, m *tgbotapi.Message, page
 	// Pagination row.
 	var nav []telegram.Button
 	if resp.PrevPage > 0 {
-		nav = append(nav, telegram.Button{Text: "< Prev", Data: fmt.Sprintf("c:arpg:%d", resp.PrevPage)})
+		nav = append(nav, telegram.Button{Text: "◀️ Prev", Data: fmt.Sprintf("c:arp:%d", resp.PrevPage)})
 	}
+	// Show current page number (non-clickable).
 	nav = append(nav, telegram.Button{Text: fmt.Sprintf("Page %d", page), Data: "c:noop"})
 	if resp.NextPage > 0 {
-		nav = append(nav, telegram.Button{Text: "Next >", Data: fmt.Sprintf("c:arpg:%d", resp.NextPage)})
+		nav = append(nav, telegram.Button{Text: "Next ▶️", Data: fmt.Sprintf("c:arp:%d", resp.NextPage)})
 	}
 	if len(nav) > 0 {
 		rows = append(rows, nav)
 	}
 	markup := telegram.InlineKeyboard(rows)
-	_, _ = d.deps.Bot.SendMessage(m.Chat.ID, "Select a repository to add:", "HTML", int32(m.MessageID), 0, markup)
+	text := fmt.Sprintf("Select a repository to add (Page %d):", page)
+	if cq != nil {
+		// Edit the existing message. If the edit fails (e.g. message is
+		// too old or content is identical), fall back to sending a new
+		// message so the user still sees the updated keyboard.
+		if err := d.deps.Bot.EditText(m.Chat.ID, int64(m.MessageID), text, "HTML", markup); err != nil {
+			_, _ = d.deps.Bot.SendMessage(m.Chat.ID, text, "HTML", 0, 0, markup)
+		}
+	} else {
+		_, _ = d.deps.Bot.SendMessage(m.Chat.ID, text, "HTML", int32(m.MessageID), 0, markup)
+	}
 	return nil
 }
 
