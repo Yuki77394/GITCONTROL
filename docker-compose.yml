@@ -1,0 +1,64 @@
+# SWAGGYMUSIC GitHub Controller Bot — Docker Compose
+#
+# Starts:
+#   - The SWAGGYMUSIC bot (this service)
+#   - MongoDB (with persistent volume, NOT exposed publicly)
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in real values.
+#   2. docker compose up -d --build
+#   3. Verify: curl http://localhost:8080/
+
+services:
+  bot:
+    build: .
+    restart: always
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    env_file: .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - swaggymusic-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT:-8080}/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mongo:
+    image: mongo:7
+    restart: always
+    # MongoDB is NOT exposed publicly. It is only reachable from the bot
+    # service via the internal Docker network.
+    expose:
+      - "27017"
+    # If you need to inspect MongoDB locally, comment out the above and
+    # uncomment the ports mapping below. NEVER expose 27017 in production.
+    # ports:
+    #   - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-swaggymusic}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-change_me_in_production}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-swaggymusic_github_bot}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - swaggymusic-net
+    healthcheck:
+      test: >
+        echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  swaggymusic-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+    driver: local

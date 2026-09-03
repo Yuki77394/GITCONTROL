@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+/bin/
+/bot
+*.exe
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker volumes
+data/
+
+# Test coverage
+coverage.out
+coverage.html
+
+# TDLib binary (not used by SWAGGYMUSIC; included here to prevent accidentally
+# committing if a TDLib-based fork is explored).
+libtdjson*

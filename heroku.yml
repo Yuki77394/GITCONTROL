@@ -1,0 +1,28 @@
+# SWAGGYMUSIC GitHub Controller Bot — Heroku deployment manifest.
+#
+# This file tells Heroku to build and run the application using the existing
+# Dockerfile (multi-stage build: golang:1.23-alpine builder → alpine:3.20
+# runtime, non-root user, static binary).
+#
+# Heroku provides the PORT environment variable at runtime. The application
+# reads PORT from the environment (see internal/config/config.go) and binds
+# to ":<PORT>" which listens on all interfaces (0.0.0.0).
+#
+# Usage:
+#   heroku create <your-app-name>
+#   heroku stack:set container
+#   git push heroku main
+#
+# All sensitive values are provided via Heroku Config Vars (never baked into
+# the image). See HEROKU_DEPLOYMENT.md for the full setup checklist.
+build:
+  docker:
+    web: Dockerfile
+
+# The Dockerfile's ENTRYPOINT runs the bot binary, which:
+#   - Starts the HTTP server on $PORT (OAuth callback + webhooks + /health)
+#   - Starts Telegram long-polling
+#   - Handles SIGTERM for graceful shutdown
+#
+# No `run:` section is needed — Heroku uses the image's ENTRYPOINT.
+# No `config:` section is needed — Config Vars are passed as env vars at runtime.
